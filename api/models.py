@@ -1,5 +1,6 @@
+from django.core.validators import RegexValidator
 from django.db import models
-
+from user.models import CustomUser
 
 # Create your models here.
 class Stock(models.Model):
@@ -29,7 +30,7 @@ class Transaction(models.Model):
     date = models.DateField()
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
-    investor = models.ForeignKey(User, on_delete=models.CASCADE)
+    investor = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     brokerage = models.FloatField()
 
     def __str__(self):
