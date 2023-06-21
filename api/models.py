@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.validators import RegexValidator
 from django.db import models
 
@@ -23,6 +25,7 @@ class Stock(models.Model):
     cnpj = models.CharField(max_length=18,
                             unique=True,
                             validators=[cnpj_validator])
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
         return self.code
@@ -33,13 +36,44 @@ class Transaction(models.Model):
         ('C', 'Compra'),
         ('V', 'Venda'),
     ]
-    date = models.DateField()
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
     investor = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     brokerage = models.FloatField()
+    price_unit = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     operation = models.CharField(
         max_length=1, choices=OPERATION_CHOICES, default='C')
+    tax_b3 = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.0)
+
+
+    def calculate_price_total(self):
+        return self.price_unit * self.quantity
+
+    def tax_totals(self):
+        return Decimal(self.brokerage) + Decimal(self.tax_b3)
+
+
+    def calculate_total_value(self):
+        purchase_price = Decimal(self.calculate_price_total())
+        tax_totals = self.tax_totals()
+
+        if self.operation == 'C':
+           
+            return purchase_price + tax_totals
+        elif self.operation == 'V':
+            
+            return purchase_price - tax_totals
+    def calculate_price_medium(self):
+        return self.calculate_total_value() / self.quantity
+
+
+    def save(self, *args, **kwargs):
+        self.price_total = self.calculate_price_total()
+        self.total_value = self.calculate_total_value()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Transaction: {self.date} - {self.stock} - {self.quantity} shares - Brokerage: {self.brokerage}"
+        return f"Transaction: {self.date} - {self.stock} - {self.quantity} shares - Brokerage: {self.brokerage} - B3 {self.tax_b3}"

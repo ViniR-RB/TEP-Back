@@ -32,4 +32,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.email;
+        return self.email
+
+
+class Investor(models.Model):
+    RISK_PROFILE_CHOICES = (
+        ('conservador', 'Conservador'),
+        ('moderado', 'Moderado'),
+        ('arrojado', 'Arrojado'),
+    )
+    user = models.OneToOneField(
+        CustomUser, on_delete=models.CASCADE, related_name='investor')
+    profile_risk = models.CharField(
+        max_length=20, choices=RISK_PROFILE_CHOICES)

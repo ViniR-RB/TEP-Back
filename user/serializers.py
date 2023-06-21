@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CustomUser
+from .models import CustomUser, Investor
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -21,7 +21,24 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls,user):
+        token = super().get_token(user)
+
+        token['first_name'] = user.first_name
+        token['last_name'] = user.last_name
+        token['id'] = user.id
+        token['email'] = user.email
+        return token
     def validate(self, attrs):
         data = super().validate(attrs)
-        # Faça qualquer processamento adicional aqui se necessário
         return data
+
+
+class InvestorSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all())
+
+    class Meta:
+        model = Investor
+        fields = '__all__'
