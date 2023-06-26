@@ -21,11 +21,11 @@ class Stock(models.Model):
         unique=True,
         validators=[code_validator]
     )
-    name_enterprise = models.CharField(max_length=255)
+    name_enterprise = models.CharField(max_length=35)
     cnpj = models.CharField(max_length=18,
                             unique=True,
                             validators=[cnpj_validator])
-    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)
 
     def __str__(self):
         return self.code
