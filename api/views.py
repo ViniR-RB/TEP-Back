@@ -58,21 +58,46 @@ class StockView(APIView):
 
 
 class TransactionView(APIView):
-    def get(self, request, transaction_id=None):
+    def get(self, request, transaction_id=None, name_code_stock=None, investor_id=None):
+        investor_id = request.user.id
         if transaction_id is not None:
-            transaction = self.get_object(transaction_id)
+            transaction = self.get_object(investor_id, transaction_id)
             if transaction:
 
                 serializer = TransactionSerializer(
                     transaction,  context={'request': request})
                 price_total = transaction.calculate_price_total()
                 total_value = transaction.calculate_total_value()
-                cont = transaction.calculate_cont()
-                pm = transaction.calculate_pm()
-                print(cont)
-                print(pm)
                 data = {"transaction": serializer.data,
-                        "cont": cont, "pm": pm,
+                        "price_total": price_total, "total_value": total_value}
+                return Response(data, status=status.HTTP_200_OK)
+            return Response(data={"msg": "Transaction not found"}, status=status.HTTP_404_NOT_FOUND)
+        elif name_code_stock is not None:
+            transactions = self.get_object_by_name_stock(
+                investor_id, name_code_stock)
+            if transactions:
+                serializer = TransactionFromStock(transactions, many=True)
+                print(transactions)
+                # Calculando o profit por ativo
+                cont = 0
+                pm = Decimal(0.0)
+                prejuizo = Decimal(0.0)
+                for transaction in transactions:
+                    if transaction.operation == 'C':
+                        pm = ((cont * pm) + transaction.calculate_total_value()) / (cont + transaction.quantity)
+                        cont += transaction.quantity
+                    elif transaction.operation == 'V':
+                        prejuizo += (transaction.calculate_total_value() - (pm * transaction.quantity))
+                        cont -= transaction.quantity
+                data = {
+                        'transaction': serializer.data,
+                        'cont': cont,
+                        'pm': pm,
+                        'prejuizo': prejuizo
+                }
+                return Response(data, status=status.HTTP_200_OK)
+
+                data = {"transaction": serializer.data,
                         "price_total": price_total, "total_value": total_value}
                 return Response(data, status=status.HTTP_200_OK)
             return Response(data={"msg": "Transaction not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -85,11 +110,19 @@ class TransactionView(APIView):
         data = {"transaction": serializer.data, "pm": pm, "cont": cont}
         return Response(data, status=status.HTTP_200_OK)
 
-    def get_object(self, transaction_id):
-        try:
-            return Transaction.objects.get(id=transaction_id)
-        except Transaction.DoesNotExist:
-            return None
+    def get_object(self, investor_id, transaction_id):
+        if transaction_id is not None:
+            try:
+                return Transaction.objects.get(id=transaction_id, investor=investor_id)
+            except Transaction.DoesNotExist:
+                return None
+
+    def get_object_by_name_stock(self, investor_id, name_code_stock):
+        if name_code_stock is not None:
+            try:
+                return Transaction.objects.filter(investor=investor_id,stock__code=name_code_stock).order_by('created_at')
+            except Transaction.DoesNotExist:
+                return None
 
     def delete(self, request, transaction_id):
         transaction = self.get_object(transaction_id)
@@ -107,7 +140,6 @@ class TransactionFromInvestorView(APIView):
             transactions = Transaction.objects.filter(investor=investor_id)
         compra = transactions.filter(operation='C')
         venda = transactions.filter(operation='V')
-
         profit = sum(transaction.calculate_total_value()
                      for transaction in compra)
         prejuizo = sum(transaction.calculate_total_value()
@@ -134,7 +166,6 @@ class TransactionFromInvestorView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, transaction_id):
-
         try:
             transaction = Transaction.objects.get(id=transaction_id)
         except Transaction.DoesNotExist:
@@ -142,6 +173,19 @@ class TransactionFromInvestorView(APIView):
 
         serializer = TransactionSerializer(
             transaction, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    def put(self, request, transaction_id):
+        try:
+            transaction = Transaction.objects.get(id=transaction_id)
+        except Transaction.DoesNotExist:
+            return Response({'msg': 'Transação não encontrada.'}, status=404)
+
+        serializer = TransactionSerializer(
+            transaction, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

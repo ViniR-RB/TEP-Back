@@ -5,10 +5,15 @@ from user.models import CustomUser, Investor
 
 
 class StockSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Stock
         fields = '__all__'
 
+class TransactionFromStock(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields= '__all__'
 
 class TransactionSerializer(serializers.ModelSerializer):
     operation = serializers.ChoiceField(choices=['C', 'V'], default='C', write_only=True)

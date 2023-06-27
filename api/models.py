@@ -70,27 +70,6 @@ class Transaction(models.Model):
     def calculate_price_medium(self):
         return self.calculate_total_value() / self.quantity
 
-    def calculate_cont(self):
-        previous_cont = Transaction.objects.filter(
-            stock=self.stock,
-            created_at__lt=self.created_at
-        ).aggregate(
-            total_quantity=Sum('quantity')
-        )['total_quantity']
-        return previous_cont if previous_cont else 0
-
-    def calculate_pm(self):
-        previous_total = Transaction.objects.filter(
-            stock=self.stock,
-            created_at__lt=self.created_at
-        ).annotate(
-            total_value=F('quantity') * F('price_unit')
-        ).aggregate(
-            total_sum=Sum('total_value')
-        )['total_sum']
-        cont = self.calculate_cont()
-        return previous_total / cont if cont != 0 else 0
-
 
     def save(self, *args, **kwargs):
         self.price_total = self.calculate_price_total()
@@ -98,4 +77,4 @@ class Transaction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Transaction: {self.date} - {self.stock} - {self.quantity} shares - Brokerage: {self.brokerage} - B3 {self.tax_b3}"
+        return f"Transaction: {self.stock} - {self.quantity} shares - Brokerage: {self.brokerage} - B3 {self.tax_b3} - Operation {self.operation}"
