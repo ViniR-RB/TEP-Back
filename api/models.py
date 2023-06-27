@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import F, Sum
 
 from user.models import CustomUser
 
@@ -42,12 +43,12 @@ class Transaction(models.Model):
     brokerage = models.FloatField()
     price_unit = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.0)
-    created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)
+    created_at = models.DateTimeField(
+        auto_now_add=False, null=True, blank=True)
     operation = models.CharField(
         max_length=1, choices=OPERATION_CHOICES, default='C')
     tax_b3 = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.0)
-
 
     def calculate_price_total(self):
         return self.price_unit * self.quantity
@@ -55,19 +56,40 @@ class Transaction(models.Model):
     def tax_totals(self):
         return Decimal(self.brokerage) + Decimal(self.tax_b3)
 
-
     def calculate_total_value(self):
         purchase_price = Decimal(self.calculate_price_total())
         tax_totals = self.tax_totals()
 
         if self.operation == 'C':
-           
+
             return purchase_price + tax_totals
         elif self.operation == 'V':
-            
+
             return purchase_price - tax_totals
+
     def calculate_price_medium(self):
         return self.calculate_total_value() / self.quantity
+
+    def calculate_cont(self):
+        previous_cont = Transaction.objects.filter(
+            stock=self.stock,
+            created_at__lt=self.created_at
+        ).aggregate(
+            total_quantity=Sum('quantity')
+        )['total_quantity']
+        return previous_cont if previous_cont else 0
+
+    def calculate_pm(self):
+        previous_total = Transaction.objects.filter(
+            stock=self.stock,
+            created_at__lt=self.created_at
+        ).annotate(
+            total_value=F('quantity') * F('price_unit')
+        ).aggregate(
+            total_sum=Sum('total_value')
+        )['total_sum']
+        cont = self.calculate_cont()
+        return previous_total / cont if cont != 0 else 0
 
 
     def save(self, *args, **kwargs):

@@ -63,10 +63,16 @@ class TransactionView(APIView):
             transaction = self.get_object(transaction_id)
             if transaction:
 
-                serializer = TransactionSerializer(transaction)
+                serializer = TransactionSerializer(
+                    transaction,  context={'request': request})
                 price_total = transaction.calculate_price_total()
                 total_value = transaction.calculate_total_value()
+                cont = transaction.calculate_cont()
+                pm = transaction.calculate_pm()
+                print(cont)
+                print(pm)
                 data = {"transaction": serializer.data,
+                        "cont": cont, "pm": pm,
                         "price_total": price_total, "total_value": total_value}
                 return Response(data, status=status.HTTP_200_OK)
             return Response(data={"msg": "Transaction not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -74,8 +80,10 @@ class TransactionView(APIView):
         transaction = Transaction.objects.all()
         transaction = transaction.annotate(
             price_total=F('price_unit') * F('quantity'))
-        serializer = TransactionSerializer(transaction, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = TransactionSerializer(
+            transaction, many=True, context={'request': request})
+        data = {"transaction": serializer.data, "pm": pm, "cont": cont}
+        return Response(data, status=status.HTTP_200_OK)
 
     def get_object(self, transaction_id):
         try:
@@ -133,7 +141,7 @@ class TransactionFromInvestorView(APIView):
             return Response({'msg': 'Transação não encontrada.'}, status=404)
 
         serializer = TransactionSerializer(
-            transaction, data=request.data, partial=True,context={'request': request})
+            transaction, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
